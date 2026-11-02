@@ -285,7 +285,7 @@ function productSave(array $in, $product_id = 0, &$error = '', $source = 'edit')
 
 /** Where a price change came from => label. */
 function productPriceSources() {
-    return ['edit' => 'Edited', 'import' => 'Imported', 'receive' => 'Stock received'];
+    return ['edit' => 'Edited', 'import' => 'Imported', 'receive' => 'Stock received', 'api' => 'API'];
 }
 
 /** Put a change to a product's price or cost in its history - $old is the product before. */
