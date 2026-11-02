@@ -31,7 +31,12 @@ if (!$product_id) {
     exit();
 }
 
-logAudit("Product", "Create", "Product #$product_id via API ($api_key_name)");
+$product_name = escapeSql(getFieldById('products', $product_id, 'product_name'));
+$api_key_name_sql = escapeSql($api_key_name);
+
+// Logging
+logAudit("Product", "Create", "$product_name via API ($api_key_name_sql)", 0, $product_id);
+logAudit("API", "Success", "Created product $product_name via API ($api_key_name_sql)", 0, $product_id);
 
 $return_arr['success'] = "True";
 $return_arr['count'] = 1;

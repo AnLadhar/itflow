@@ -5,7 +5,10 @@ require_once '../require_post_method.php';
 
 // Products aren't client-scoped; access is gated by module_sales in enforce_api_rbac.php
 
-$product_id = intval($_POST['product_id'] ?? 0);
+// $_POST is null when the body isn't valid JSON, and productSave() needs an array
+$input = (array) $_POST;
+
+$product_id = intval($input['product_id'] ?? 0);
 
 if (!$product_id) {
     header("HTTP/1.1 400 Bad Request");
@@ -16,7 +19,7 @@ if (!$product_id) {
 }
 
 // functions/products.php - same validation, stock rules and price history as the UI
-if (!productSave($_POST, $product_id, $error, 'api')) {
+if (!productSave($input, $product_id, $error, 'api')) {
     header("HTTP/1.1 422 Unprocessable Entity");
     $return_arr['success'] = "False";
     $return_arr['message'] = $error;
@@ -24,19 +27,25 @@ if (!productSave($_POST, $product_id, $error, 'api')) {
     exit();
 }
 
-logAudit("Product", "Edit", "Product #$product_id via API ($api_key_name)");
+$product_name = escapeSql(getFieldById('products', $product_id, 'product_name'));
+$api_key_name_sql = escapeSql($api_key_name);
+
+// Logging
+logAudit("Product", "Edit", "$product_name via API ($api_key_name_sql)", 0, $product_id);
+logAudit("API", "Success", "Edited product $product_name via API ($api_key_name_sql)", 0, $product_id);
 
 $return_arr['success'] = "True";
 $return_arr['count'] = 1;
 
-// Optional: reprice - udpate price on existing invoices
-if (!empty($_POST['reprice'])) {
+// Optional: reprice - move the lines at an old price on recurring invoices, draft invoices and draft quotes to the new price
+if (!empty($input['reprice'])) {
     $changes = [];
     $own_price = 0;
     foreach (productRepriceLines(['product_id' => $product_id])[$product_id]['lines'] ?? [] as $line) {
         if ($line['old']) {
             $changes[$line['kind'] . ':' . intval($line['item_id'])] = (string) $line['suggested'];
         } else {
+            // A price of its own, agreed with the client - left alone
             $own_price++;
         }
     }
@@ -49,7 +58,7 @@ if (!empty($_POST['reprice'])) {
     } else {
         $return_arr['reprice'] = $done + ['own_price_skipped' => $own_price];
         if ($done['lines']) {
-            logAudit("Product", "Edit", "$api_key_name updated the price of {$done['lines']} line(s) on {$done['documents']} recurring invoice(s), draft(s) and quote(s) from the catalog");
+            logAudit("Product", "Edit", "$api_key_name_sql updated the price of {$done['lines']} line(s) on {$done['documents']} recurring invoice(s), draft(s) and quote(s) from the catalog", 0, $product_id);
         }
     }
 }
